@@ -4,8 +4,7 @@ WORKDIR /app
 
 RUN apt update -y
 RUN apt upgrade -y
-RUN apt install -y upx-ucl gcc-mingw-w64 lld
-RUN ln -sf /usr/bin/lld /usr/bin/i686-w64-mingw32-ld
+RUN apt install -y upx-ucl gcc-mingw-w64
 
 RUN go install mvdan.cc/garble@master
 
