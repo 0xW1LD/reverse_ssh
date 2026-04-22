@@ -4,11 +4,6 @@
 
 void OnProcessAttach();
 
-DWORD WINAPI MyThreadFunction(LPVOID lpParam)
-{
-    return 0;
-}
-
 BOOL WINAPI DllMain(
     HINSTANCE hinstDLL, // handle to DLL module
     DWORD _fdwReason,    // reason for calling function
