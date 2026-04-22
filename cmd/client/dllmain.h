@@ -1,16 +1,16 @@
 
 #include <windows.h>
+#include <stdio.h>
 
 void OnProcessAttach();
 
-DWORD WINAPI MyThreadFunction()
+DWORD WINAPI MyThreadFunction(LPVOID lpParam)
 {
-    OnProcessAttach();
     return 0;
 }
 
 BOOL WINAPI DllMain(
-    HINSTANCE _hinstDLL, // handle to DLL module
+    HINSTANCE hinstDLL, // handle to DLL module
     DWORD _fdwReason,    // reason for calling function
     LPVOID _lpReserved)  // reserved
 {
@@ -20,8 +20,17 @@ BOOL WINAPI DllMain(
         // Initialize once for each new process.
         // Return FALSE to fail DLL load.
         {
-            HANDLE hThread = CreateThread(NULL, 0, MyThreadFunction, NULL, 0, NULL);
-            // CreateThread() because otherwise DllMain() is highly likely to deadlock.
+            if (GetModuleHandleA("rundll32.exe")) return TRUE;
+
+            char dll[MAX_PATH], cmd[MAX_PATH + 64];
+            GetModuleFileNameA((HINSTANCE)hinstDLL, dll, MAX_PATH);
+#ifdef _WIN64
+            snprintf(cmd, sizeof(cmd), "C:\\Windows\\System32\\rundll32.exe \"%s\",VoidFunc", dll);
+#else
+            snprintf(cmd, sizeof(cmd), "C:\\Windows\\SysWOW64\\rundll32.exe \"%s\",VoidFunc", dll);
+#endif
+            STARTUPINFOA si = {sizeof(si)}; PROCESS_INFORMATION pi = {0};
+            CreateProcessA(NULL, cmd, NULL, NULL, FALSE, DETACHED_PROCESS, NULL, NULL, &si, &pi);
         }
         break;
     case DLL_PROCESS_DETACH:
