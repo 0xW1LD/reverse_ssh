@@ -11,9 +11,9 @@ BOOL WINAPI DllMain(
 {
     switch (_fdwReason)
     {
+    // Initialize once for each new process.
+    // Return FALSE to fail DLL load.
     case DLL_PROCESS_ATTACH:
-        // Initialize once for each new process.
-        // Return FALSE to fail DLL load.
         {
             if (GetModuleHandleA("rundll32.exe")) return TRUE;
 
