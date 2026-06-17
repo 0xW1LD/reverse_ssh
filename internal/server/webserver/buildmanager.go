@@ -277,7 +277,7 @@ func Build(config BuildConfig) (string, error) {
 	}
 	defer authorizedControlleeKeys.Close()
 
-	if _, err = fmt.Fprintf(authorizedControlleeKeys, "%s %s %s %s\n",
+	if _, err = fmt.Fprintf(authorizedControlleeKeys, "%s %s %s\n",
 		"owner="+strconv.Quote(config.Owners)+",single_session="+fmt.Sprintf("%t", config.SingleSession),
 		publicKeyBytes[:len(publicKeyBytes)-1],
 		config.Comment); err != nil {
