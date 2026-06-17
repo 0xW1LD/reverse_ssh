@@ -277,8 +277,16 @@ func Build(config BuildConfig) (string, error) {
 	}
 	defer authorizedControlleeKeys.Close()
 
+	opts := []string{
+		"owner=" + strconv.Quote(config.Owners),
+	}
+
+	if config.SingleSession {
+		opts = append(opts, "single_session")
+	}
+
 	if _, err = fmt.Fprintf(authorizedControlleeKeys, "%s %s %s\n",
-		"owner="+strconv.Quote(config.Owners)+",single_session="+fmt.Sprintf("%t", config.SingleSession),
+		strings.Join(opts, ","),
 		publicKeyBytes[:len(publicKeyBytes)-1],
 		config.Comment); err != nil {
 		return "", errors.New("cant write newly generated key to authorized controllee keys file: " + err.Error())

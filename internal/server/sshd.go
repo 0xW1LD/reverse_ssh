@@ -68,10 +68,15 @@ func readPubKeys(path string) (m map[string]Options, err error) {
 					opts.DenyList = append(opts.DenyList, deny...)
 				case "owner":
 					opts.Owners = ParseOwnerDirective(parts[1])
-				case "single_session":
-					opts.SingleSession = parts[1] == "true"
 				}
+				continue
+			}
 
+			if len(parts) == 1 {
+				switch o {
+				case "single_session":
+					opts.SingleSession = true
+				}
 			}
 		}
 
