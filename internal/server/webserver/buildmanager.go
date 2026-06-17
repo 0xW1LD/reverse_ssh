@@ -56,6 +56,7 @@ type BuildConfig struct {
 	DisableLibC   bool
 	RawDownload   bool
 	UseHostHeader bool
+	SingleSession bool
 
 	WorkingDirectory string
 
@@ -276,7 +277,10 @@ func Build(config BuildConfig) (string, error) {
 	}
 	defer authorizedControlleeKeys.Close()
 
-	if _, err = authorizedControlleeKeys.WriteString(fmt.Sprintf("%s %s %s\n", "owner="+strconv.Quote(config.Owners), publicKeyBytes[:len(publicKeyBytes)-1], config.Comment)); err != nil {
+	if _, err = fmt.Fprintf(authorizedControlleeKeys, "%s %s %s %s\n",
+		"owner="+strconv.Quote(config.Owners)+",single_session="+fmt.Sprintf("%t", config.SingleSession),
+		publicKeyBytes[:len(publicKeyBytes)-1],
+		config.Comment); err != nil {
 		return "", errors.New("cant write newly generated key to authorized controllee keys file: " + err.Error())
 	}
 

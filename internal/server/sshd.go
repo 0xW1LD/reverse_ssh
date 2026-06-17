@@ -28,6 +28,9 @@ type Options struct {
 	Comment   string
 
 	Owners []string
+
+	// Only allow one rssh client with this public key to connect at a given time
+	SingleSession bool
 }
 
 func readPubKeys(path string) (m map[string]Options, err error) {
@@ -50,6 +53,8 @@ func readPubKeys(path string) (m map[string]Options, err error) {
 			return m, fmt.Errorf("unable to parse public key. %s line %d. Reason: %s", path, i+1, err)
 		}
 
+		log.Println(comment, options)
+
 		var opts Options
 		opts.Comment = comment
 
@@ -63,6 +68,8 @@ func readPubKeys(path string) (m map[string]Options, err error) {
 					opts.DenyList = append(opts.DenyList, deny...)
 				case "owner":
 					opts.Owners = ParseOwnerDirective(parts[1])
+				case "single_session":
+					opts.SingleSession = parts[1] == "true"
 				}
 
 			}
@@ -176,10 +183,8 @@ func CheckAuth(keysPath string, publicKey ssh.PublicKey, src net.IP, insecure bo
 		return nil, ErrKeyNotInList
 	}
 
-	var opt Options
+	opt, ok := keys[string(ssh.MarshalAuthorizedKey(publicKey))]
 	if !insecure {
-		var ok bool
-		opt, ok = keys[string(ssh.MarshalAuthorizedKey(publicKey))]
 		if !ok {
 			return nil, ErrKeyNotInList
 		}
@@ -203,14 +208,20 @@ func CheckAuth(keysPath string, publicKey ssh.PublicKey, src net.IP, insecure bo
 		}
 	}
 
-	return &ssh.Permissions{
+	perms := &ssh.Permissions{
 		// Record the public key used for authentication.
 		Extensions: map[string]string{
 			"comment":   opt.Comment,
 			"pubkey-fp": internal.FingerprintSHA1Hex(publicKey),
 			"owners":    strings.Join(opt.Owners, ","),
 		},
-	}, nil
+	}
+
+	if opt.SingleSession {
+		perms.Extensions["single_session"] = "true"
+	}
+
+	return perms, nil
 
 }
 
