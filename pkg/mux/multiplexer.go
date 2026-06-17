@@ -595,7 +595,7 @@ func (m *Multiplexer) unwrapWebsockets(conn net.Conn) (net.Conn, protocols.Type,
 			wsW := websocketWrapper{
 				wsConn:  c,
 				tcpConn: conn,
-				done:    make(chan interface{}),
+				done:    make(chan any),
 			}
 
 			wsConnChan <- &wsW

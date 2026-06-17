@@ -307,9 +307,9 @@ func startBuildManager(_cachePath string) error {
 		return fmt.Errorf("unable to run the go compiler to get a list of compilation targets: %s", err)
 	}
 
-	platformAndArch := bytes.Split(output, []byte("\n"))
+	platformAndArch := bytes.SplitSeq(output, []byte("\n"))
 
-	for _, line := range platformAndArch {
+	for line := range platformAndArch {
 		parts := bytes.Split(line, []byte("/"))
 		if len(parts) == 2 {
 			validPlatforms[string(parts[0])] = true

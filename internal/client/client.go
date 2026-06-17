@@ -583,7 +583,7 @@ func Run(settings *Settings) {
 
 					err := ssh.Unmarshal(req.Payload, &rf)
 					if err != nil {
-						req.Reply(false, []byte(fmt.Sprintf("Unable to unmarshal remote forward request in order to stop it: %s", err.Error())))
+						req.Reply(false, fmt.Appendf(nil, "Unable to unmarshal remote forward request in order to stop it: %s", err.Error()))
 						return
 					}
 

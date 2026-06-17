@@ -10,7 +10,7 @@ import (
 type websocketWrapper struct {
 	wsConn  *websocket.Conn
 	tcpConn net.Conn
-	done    chan interface{}
+	done    chan any
 }
 
 func (ww *websocketWrapper) Read(b []byte) (n int, err error) {
