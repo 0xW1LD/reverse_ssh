@@ -15,7 +15,7 @@ func GetPivotParent(c net.Conn) string {
 	type unwrapper interface {
 		Unwrap() net.Conn
 	}
-	for c != nil {
+	for i := 0; i < 10 && c != nil; i++ {
 		if p, ok := c.(PivotParenter); ok {
 			return p.PivotParent()
 		}
