@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -37,6 +38,10 @@ func findUPXBinary() (string, error) {
 	}
 	return "", errors.New("upx could not be found in PATH (tried: upx, upx-ucl)")
 }
+
+var (
+	validLinkerField = regexp.MustCompile(`^[A-Za-z0-9_.:/@-]*$`)
+)
 
 type BuildConfig struct {
 	Name, Comment, Owners string
@@ -184,7 +189,27 @@ func Build(config BuildConfig) (string, error) {
 		return "", err
 	}
 
-	buildArguments = append(buildArguments, fmt.Sprintf("-ldflags=-s -w -X main.logLevel=%s -X main.destination=%s -X main.fingerprint=%s -X main.proxy=%s -X main.customSNI=%s -X main.useHostKerberos=%t -X main.ntlmProxyCreds=%s -X main.versionString=%s -X github.com/NHAS/reverse_ssh/internal.Version=%s", config.LogLevel, config.ConnectBackAdress, config.Fingerprint, config.Proxy, config.SNI, config.UseKerberosAuth, config.NTLMProxyCreds, strings.TrimSpace(config.VersionString), strings.TrimSpace(f.Version)))
+	customLinkerFlags := map[string]string{
+		"main.logLevel":        config.LogLevel,
+		"main.destination":     config.ConnectBackAdress,
+		"main.fingerprint":     config.Fingerprint,
+		"main.proxy":           config.Proxy,
+		"main.customSNI":       config.SNI,
+		"main.useHostKerberos": fmt.Sprintf("%t", config.UseKerberosAuth),
+		"main.ntlmProxyCreds":  config.NTLMProxyCreds,
+		"main.versionString":   strings.TrimSpace(config.VersionString),
+		"github.com/NHAS/reverse_ssh/internal.Version": strings.TrimSpace(f.Version),
+	}
+
+	ldflags := []string{"-s", "-w"}
+	for ldFlag, value := range customLinkerFlags {
+		if !validLinkerField.MatchString(value) {
+			return "", fmt.Errorf("invalid characters in linker field: %q: %q", ldFlag, value)
+		}
+		ldflags = append(ldflags, fmt.Sprintf("-X '%s=%s'", ldFlag, value))
+	}
+
+	buildArguments = append(buildArguments, "-ldflags="+strings.Join(ldflags, " "))
 	buildArguments = append(buildArguments, "-o", f.FilePath, filepath.Join(projectRoot, "/cmd/client"))
 
 	cmd := exec.Command(buildTool, buildArguments...)
@@ -288,7 +313,7 @@ func Build(config BuildConfig) (string, error) {
 	if _, err = fmt.Fprintf(authorizedControlleeKeys, "%s %s %s\n",
 		strings.Join(opts, ","),
 		publicKeyBytes[:len(publicKeyBytes)-1],
-		config.Comment); err != nil {
+		strings.NewReplacer("\n", "", "\r", "").Replace(config.Comment)); err != nil {
 		return "", errors.New("cant write newly generated key to authorized controllee keys file: " + err.Error())
 	}
 
