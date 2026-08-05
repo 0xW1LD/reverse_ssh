@@ -54,8 +54,6 @@ func readPubKeys(path string) (m map[string]Options, err error) {
 			return m, fmt.Errorf("unable to parse public key. %s line %d. Reason: %s", path, i+1, err)
 		}
 
-		log.Println(comment, options)
-
 		var opts Options
 		opts.Comment = comment
 
