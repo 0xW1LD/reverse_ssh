@@ -18,6 +18,7 @@ import (
 	"github.com/NHAS/reverse_ssh/internal/server/observers"
 	"github.com/NHAS/reverse_ssh/internal/server/users"
 	"github.com/NHAS/reverse_ssh/pkg/logger"
+	"github.com/NHAS/reverse_ssh/pkg/mux"
 	"github.com/fatih/color"
 	"golang.org/x/crypto/ssh"
 )
@@ -28,6 +29,9 @@ type Options struct {
 	Comment   string
 
 	Owners []string
+
+	// Only allow one rssh client with this public key to connect at a given time
+	SingleSession bool
 }
 
 func readPubKeys(path string) (m map[string]Options, err error) {
@@ -64,7 +68,14 @@ func readPubKeys(path string) (m map[string]Options, err error) {
 				case "owner":
 					opts.Owners = ParseOwnerDirective(parts[1])
 				}
+				continue
+			}
 
+			if len(parts) == 1 {
+				switch o {
+				case "single_session":
+					opts.SingleSession = true
+				}
 			}
 		}
 
@@ -87,8 +98,8 @@ func ParseOwnerDirective(owners string) []string {
 func ParseFromDirective(addresses string) (deny, allow []*net.IPNet) {
 	list := strings.Trim(addresses, "\"")
 
-	directives := strings.Split(list, ",")
-	for _, directive := range directives {
+	directives := strings.SplitSeq(list, ",")
+	for directive := range directives {
 		if len(directive) > 0 {
 			switch directive[0] {
 			case '!':
@@ -176,10 +187,8 @@ func CheckAuth(keysPath string, publicKey ssh.PublicKey, src net.IP, insecure bo
 		return nil, ErrKeyNotInList
 	}
 
-	var opt Options
+	opt, ok := keys[string(ssh.MarshalAuthorizedKey(publicKey))]
 	if !insecure {
-		var ok bool
-		opt, ok = keys[string(ssh.MarshalAuthorizedKey(publicKey))]
 		if !ok {
 			return nil, ErrKeyNotInList
 		}
@@ -203,14 +212,20 @@ func CheckAuth(keysPath string, publicKey ssh.PublicKey, src net.IP, insecure bo
 		}
 	}
 
-	return &ssh.Permissions{
+	perms := &ssh.Permissions{
 		// Record the public key used for authentication.
 		Extensions: map[string]string{
 			"comment":   opt.Comment,
 			"pubkey-fp": internal.FingerprintSHA1Hex(publicKey),
 			"owners":    strings.Join(opt.Owners, ","),
 		},
-	}, nil
+	}
+
+	if opt.SingleSession {
+		perms.Extensions["single_session"] = "true"
+	}
+
+	return perms, nil
 
 }
 
@@ -389,6 +404,9 @@ func getIP(ip string) net.IP {
 
 func acceptConn(c net.Conn, config *ssh.ServerConfig, timeout int, dataDir string) {
 
+	// Capture pivot parent before any wrapping obscures the annotation.
+	pivotParent := mux.GetPivotParent(c)
+
 	//Initially set the timeout high, so people who type in their ssh key password can actually use rssh
 	realConn := &internal.TimeoutConn{Conn: c, Timeout: time.Duration(timeout) * time.Minute}
 
@@ -397,6 +415,11 @@ func acceptConn(c net.Conn, config *ssh.ServerConfig, timeout int, dataDir strin
 	if err != nil {
 		log.Printf("Failed to handshake (%s)", err.Error())
 		return
+	}
+
+	// Record pivot parent (if any) so commands like 'map' can reconstruct topology.
+	if pivotParent != "" && sshConn.Permissions != nil {
+		sshConn.Permissions.Extensions["pivot-parent"] = pivotParent
 	}
 
 	clientLog := logger.NewLog(sshConn.RemoteAddr().String())
@@ -408,7 +431,7 @@ func acceptConn(c net.Conn, config *ssh.ServerConfig, timeout int, dataDir strin
 
 		go func() {
 			for {
-				_, _, err = sshConn.SendRequest("keepalive-rssh@golang.org", true, []byte(fmt.Sprintf("%d", timeout)))
+				_, _, err = sshConn.SendRequest("keepalive-rssh@golang.org", true, fmt.Appendf(nil, "%d", timeout))
 				if err != nil {
 					clientLog.Info("Failed to send keepalive, assuming client has disconnected")
 					sshConn.Close()
